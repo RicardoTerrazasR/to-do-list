@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { LogIn } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,44 +30,80 @@ export default function LoginPage() {
   }, [])
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600">
-      <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">🔐 Iniciar Sesión</h1>
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-100 px-4">
+      <div className="bg-white shadow-xl rounded-3xl p-8 w-full max-w-md border border-amber-200">
+        {/* Encabezado */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="bg-amber-400 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-md mb-3">
+            <LogIn className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 text-center">
+            Bienvenido de nuevo 👋
+          </h1>
+          <p className="text-gray-500 text-sm mt-1 text-center">
+            Inicia sesión para acceder a tu panel
+          </p>
+        </div>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          <input
-            className="border border-gray-300 rounded-lg p-2"
-            type="email"
-            placeholder="Correo electrónico"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            className="border border-gray-300 rounded-lg p-2"
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+        {/* Formulario */}
+        <form onSubmit={handleLogin} className="flex flex-col gap-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Correo electrónico
+            </label>
+            <input
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none transition"
+            />
+          </div>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Contraseña
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none transition"
+            />
+          </div>
+
+          {error && (
+            <p className="text-red-600 text-sm bg-red-50 border border-red-200 p-2 rounded-lg text-center">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2 font-semibold transition"
+            className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3 font-semibold transition flex items-center justify-center gap-2"
           >
-            {loading ? 'Cargando...' : 'Entrar'}
+            {loading ? (
+              <span className="animate-pulse">Iniciando sesión...</span>
+            ) : (
+              <>
+                <LogIn className="w-5 h-5" />
+                Entrar
+              </>
+            )}
           </button>
 
-          <a
-            href="/signup"
-            className="text-indigo-600 hover:underline text-sm mt-2 text-center"
-          >
-            ¿No tienes cuenta? Regístrate
-          </a>
+          <div className="text-center text-sm mt-3">
+            <a
+              href="/signup"
+              className="text-amber-600 hover:underline font-medium"
+            >
+              ¿No tienes cuenta? Regístrate
+            </a>
+          </div>
         </form>
       </div>
     </main>

@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
+import { ArrowLeft, ArrowRight, Trash2, LogOut, PlusCircle, BarChart3 } from 'lucide-react'
+import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
 
 type Task = {
   id: string
@@ -14,6 +16,13 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
   const [user, setUser] = useState<any>(null)
+  const [currentColumn, setCurrentColumn] = useState(0)
+
+  const columns = [
+    { key: 'todo', title: 'Por hacer', color: 'border-l-4 border-amber-400' },
+    { key: 'doing', title: 'En progreso', color: 'border-l-4 border-yellow-400' },
+    { key: 'done', title: 'Completado', color: 'border-l-4 border-green-400' },
+  ]
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -46,7 +55,7 @@ export default function Dashboard() {
 
   async function moveTask(id: string, newStatus: Task['status']) {
     await supabase.from('tasks').update({ status: newStatus }).eq('id', id)
-    setTasks(tasks.map(t => (t.id === id ? { ...t, status: newStatus } : t)))
+    setTasks(tasks.map((t) => (t.id === id ? { ...t, status: newStatus } : t)))
   }
 
   async function deleteTask(id: string) {
@@ -59,94 +68,163 @@ export default function Dashboard() {
     router.push('/login')
   }
 
-  const columns = [
-    { key: 'todo', title: '🟢 Por hacer', color: 'bg-green-500' },
-    { key: 'doing', title: '🟡 En proceso', color: 'bg-yellow-500' },
-    { key: 'done', title: '🔵 Hecho', color: 'bg-blue-500' },
+  // Datos para el gráfico
+  const pieData = [
+    { name: 'Por hacer', value: tasks.filter((t) => t.status === 'todo').length },
+    { name: 'En progreso', value: tasks.filter((t) => t.status === 'doing').length },
+    { name: 'Completado', value: tasks.filter((t) => t.status === 'done').length },
   ]
+  const COLORS = ['#FDBA74', '#FACC15', '#34D399']
+
+  const current = columns[currentColumn]
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 p-6 text-white">
-      <div className="max-w-6xl mx-auto">
+    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-100 p-4 sm:p-6 text-gray-900">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">📋 Mi Tablero Kanban</h1>
+        <header className="flex flex-col sm:flex-row justify-between items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-amber-600 text-center sm:text-left">
+            Mi Panel de Tareas
+          </h1>
           <button
             onClick={logout}
-            className="text-sm bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"
+            className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition text-sm sm:text-base"
           >
-            Cerrar sesión
+            <LogOut className="w-4 h-4" />
+            <span>Cerrar sesión</span>
           </button>
-        </div>
+        </header>
 
-        {/* Crear tarea */}
-        <div className="flex justify-center mb-8">
+        {/* Nueva tarea */}
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
           <input
             type="text"
-            placeholder="Nueva tarea..."
-            className="p-2 rounded-l-lg text-black w-64"
+            placeholder="Escribe una nueva tarea..."
+            className="p-3 rounded-xl border border-gray-300 w-full sm:w-80 focus:ring-2 focus:ring-amber-400 outline-none"
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
           />
           <button
             onClick={addTask}
-            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-r-lg font-semibold"
+            className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 rounded-xl font-semibold transition w-full sm:w-auto"
           >
+            <PlusCircle className="w-5 h-5" />
             Agregar
           </button>
         </div>
 
-        {/* Kanban */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {columns.map((col, index) => (
-            <div key={col.key} className={`backdrop-blur-md rounded-xl p-4 shadow-lg min-h-[300px] bg-white/10`}>
-              <h2 className={`text-xl font-semibold mb-4 text-center ${col.color}`}>{col.title}</h2>
+        {/* Contenido principal */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Columna actual */}
+          <div
+            className={`backdrop-blur-md bg-white rounded-2xl p-5 sm:p-6 shadow-xl min-h-[350px] ${current.color}`}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <button
+                disabled={currentColumn === 0}
+                onClick={() => setCurrentColumn((c) => Math.max(0, c - 1))}
+                className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition disabled:opacity-40"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-700" />
+              </button>
+              <h2 className="text-lg font-semibold text-amber-600 uppercase text-center flex-1">
+                {current.title}
+              </h2>
+              <button
+                disabled={currentColumn === columns.length - 1}
+                onClick={() => setCurrentColumn((c) => Math.min(columns.length - 1, c + 1))}
+                className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition disabled:opacity-40"
+              >
+                <ArrowRight className="w-5 h-5 text-gray-700" />
+              </button>
+            </div>
 
-              {tasks.filter((t) => t.status === col.key).map((task) => (
+            {tasks.filter((t) => t.status === current.key).length === 0 && (
+              <p className="text-center text-gray-400 text-sm italic">Sin tareas aquí</p>
+            )}
+
+            {tasks
+              .filter((t) => t.status === current.key)
+              .map((task) => (
                 <div
                   key={task.id}
-                  className="bg-white text-black rounded-lg p-3 mb-3 shadow-md transition hover:scale-[1.03] flex justify-between items-center"
+                  className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3 shadow-sm flex flex-col sm:flex-row justify-between sm:items-center gap-2"
                 >
-                  <p className="font-medium">{task.title}</p>
-                  <div className="flex gap-2">
-                    {/* Flechas */}
-                    {col.key !== 'todo' && (
+                  <input
+                    type="text"
+                    value={task.title}
+                    onChange={async (e) => {
+                      const newTitle = e.target.value
+                      setTasks(tasks.map((t) => (t.id === task.id ? { ...t, title: newTitle } : t)))
+                      await supabase.from('tasks').update({ title: newTitle }).eq('id', task.id)
+                    }}
+                    className="font-medium bg-transparent outline-none flex-1 text-sm sm:text-base"
+                  />
+                  <div className="flex gap-1 sm:gap-2 self-end sm:self-center">
+                    {current.key !== 'todo' && (
                       <button
-                        onClick={() => moveTask(task.id, index === 2 ? 'doing' : 'todo')}
-                        className="text-gray-600 hover:text-gray-900 font-bold"
+                        onClick={() => moveTask(task.id, currentColumn === 2 ? 'doing' : 'todo')}
+                        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition"
+                        title="Mover a anterior"
                       >
-                        ⬅
+                        <ArrowLeft className="w-4 h-4 text-gray-700" />
                       </button>
                     )}
-                    {col.key !== 'done' && (
+                    {current.key !== 'done' && (
                       <button
-                        onClick={() =>
-                          moveTask(task.id, index === 0 ? 'doing' : 'done')
-                        }
-                        className="text-gray-600 hover:text-gray-900 font-bold"
+                        onClick={() => moveTask(task.id, currentColumn === 0 ? 'doing' : 'done')}
+                        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition"
+                        title="Mover a siguiente"
                       >
-                        ➡
+                        <ArrowRight className="w-4 h-4 text-gray-700" />
                       </button>
                     )}
-                    {/* Eliminar */}
                     <button
                       onClick={() => deleteTask(task.id)}
-                      className="text-red-600 hover:text-red-800 font-bold"
+                      className="p-2 rounded-lg bg-red-100 hover:bg-red-200 transition"
+                      title="Eliminar tarea"
                     >
-                      🗑
+                      <Trash2 className="w-4 h-4 text-red-600" />
                     </button>
                   </div>
                 </div>
               ))}
+          </div>
 
-              {tasks.filter((t) => t.status === col.key).length === 0 && (
-                <p className="text-center text-gray-300 text-sm italic">
-                  Sin tareas aquí ✨
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
+          {/* Gráfico */}
+          <div className="bg-white rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center">
+            <h2 className="text-lg font-semibold text-amber-600 mb-4 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" /> Progreso General
+            </h2>
+            <PieChart width={280} height={250}>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={90}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {pieData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+
+            <p className="text-sm text-gray-600 mt-2">
+              Progreso completado:{' '}
+              <span className="font-semibold text-amber-600">
+                {Math.round(
+                  (tasks.filter((t) => t.status === 'done').length / (tasks.length || 1)) * 100
+                )}
+                %
+              </span>
+            </p>
+          </div>
+        </section>
       </div>
     </main>
   )

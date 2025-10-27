@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { UserPlus } from 'lucide-react'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -17,10 +18,7 @@ export default function SignupPage() {
     setSuccess('')
     setLoading(true)
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
+    const { error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
       setError('❌ ' + error.message)
@@ -33,45 +31,85 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500">
-      <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">📝 Crear Cuenta</h1>
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-100 px-4">
+      <div className="bg-white shadow-xl rounded-3xl p-8 w-full max-w-md border border-amber-200">
+        {/* Header */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="bg-amber-400 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-md mb-3">
+            <UserPlus className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 text-center">
+            Crear cuenta nueva ✨
+          </h1>
+          <p className="text-gray-500 text-sm mt-1 text-center">
+            Regístrate para acceder a tu panel de tareas
+          </p>
+        </div>
 
-        <form onSubmit={handleSignup} className="flex flex-col gap-4">
-          <input
-            className="border border-gray-300 rounded-lg p-2"
-            type="email"
-            placeholder="Correo electrónico"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            className="border border-gray-300 rounded-lg p-2"
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+        {/* Form */}
+        <form onSubmit={handleSignup} className="flex flex-col gap-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Correo electrónico
+            </label>
+            <input
+              type="email"
+              placeholder="tucorreo@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none transition"
+            />
+          </div>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          {success && <p className="text-green-600 text-sm">{success}</p>}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Contraseña
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none transition"
+            />
+          </div>
+
+          {error && (
+            <p className="text-red-600 text-sm bg-red-50 border border-red-200 p-2 rounded-lg text-center">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="text-green-600 text-sm bg-green-50 border border-green-200 p-2 rounded-lg text-center">
+              {success}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-2 font-semibold transition"
+            className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3 font-semibold transition flex items-center justify-center gap-2"
           >
-            {loading ? 'Creando...' : 'Registrarme'}
+            {loading ? (
+              <span className="animate-pulse">Creando cuenta...</span>
+            ) : (
+              <>
+                <UserPlus className="w-5 h-5" />
+                Registrarme
+              </>
+            )}
           </button>
 
-          <a
-            href="/login"
-            className="text-purple-600 hover:underline text-sm mt-2 text-center"
-          >
-            ¿Ya tienes cuenta? Inicia sesión
-          </a>
+          <div className="text-center text-sm mt-3">
+            <a
+              href="/login"
+              className="text-amber-600 hover:underline font-medium"
+            >
+              ¿Ya tienes cuenta? Inicia sesión
+            </a>
+          </div>
         </form>
       </div>
     </main>
