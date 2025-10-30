@@ -2,21 +2,57 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
-import { ArrowLeft, ArrowRight, Trash2, LogOut, PlusCircle, BarChart3 } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Trash2,
+  LogOut,
+  PlusCircle,
+  BarChart3,
+  X,
+} from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
 
+// @ts-expect-error — omitimos tipos del calendario
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar'
+import { format, parse, startOfWeek, getDay } from 'date-fns'
+import { es } from 'date-fns/locale'
+import 'react-big-calendar/lib/css/react-big-calendar.css'
+
+const locales = { es }
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+})
+
+// 🔹 Tipos
 type Task = {
   id: string
   title: string
   status: 'todo' | 'doing' | 'done'
+  due_date?: string | null
+}
+
+type CalendarEvent = {
+  id: string
+  title: string
+  start: Date
+  end: Date
 }
 
 export default function Dashboard() {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
+  const [newDate, setNewDate] = useState<string>('')
   const [user, setUser] = useState<any>(null)
   const [currentColumn, setCurrentColumn] = useState(0)
+  const [showModal, setShowModal] = useState(false)
+  const [modalDate, setModalDate] = useState<Date | null>(null)
+  const [modalTitle, setModalTitle] = useState('')
 
   const columns = [
     { key: 'todo', title: 'Por hacer', color: 'border-l-4 border-amber-400' },
@@ -47,10 +83,18 @@ export default function Dashboard() {
     if (!newTask.trim() || !user) return
     const { data, error } = await supabase
       .from('tasks')
-      .insert([{ title: newTask, user_id: user.id }])
+      .insert([
+        {
+          title: newTask,
+          user_id: user.id,
+          due_date: newDate || null,
+          status: 'todo',
+        },
+      ])
       .select()
     if (!error && data) setTasks([...tasks, data[0] as Task])
     setNewTask('')
+    setNewDate('')
   }
 
   async function moveTask(id: string, newStatus: Task['status']) {
@@ -68,18 +112,35 @@ export default function Dashboard() {
     router.push('/login')
   }
 
-  // Datos para el gráfico
+  async function addTaskFromCalendar() {
+    if (!modalTitle.trim() || !modalDate || !user) return
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([
+        {
+          title: modalTitle,
+          user_id: user.id,
+          due_date: modalDate,
+          status: 'todo',
+        },
+      ])
+      .select()
+    if (!error && data) setTasks([...tasks, data[0] as Task])
+    setShowModal(false)
+    setModalTitle('')
+    setModalDate(null)
+  }
+
   const pieData = [
     { name: 'Por hacer', value: tasks.filter((t) => t.status === 'todo').length },
     { name: 'En progreso', value: tasks.filter((t) => t.status === 'doing').length },
     { name: 'Completado', value: tasks.filter((t) => t.status === 'done').length },
   ]
   const COLORS = ['#FDBA74', '#FACC15', '#34D399']
-
   const current = columns[currentColumn]
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-100 p-4 sm:p-6 text-gray-900">
+    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-100 p-4 sm:p-6 text-gray-900 relative">
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <header className="flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -104,6 +165,12 @@ export default function Dashboard() {
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
           />
+          <input
+            type="date"
+            className="p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-amber-400 outline-none"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+          />
           <button
             onClick={addTask}
             className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 rounded-xl font-semibold transition w-full sm:w-auto"
@@ -113,9 +180,8 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Contenido principal */}
+        {/* Kanban + gráfico */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Columna actual */}
           <div
             className={`backdrop-blur-md bg-white rounded-2xl p-5 sm:p-6 shadow-xl min-h-[350px] ${current.color}`}
           >
@@ -191,7 +257,6 @@ export default function Dashboard() {
               ))}
           </div>
 
-          {/* Gráfico */}
           <div className="bg-white rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center">
             <h2 className="text-lg font-semibold text-amber-600 mb-4 flex items-center gap-2">
               <BarChart3 className="w-5 h-5" /> Progreso General
@@ -206,8 +271,8 @@ export default function Dashboard() {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {pieData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                {pieData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
@@ -225,7 +290,73 @@ export default function Dashboard() {
             </p>
           </div>
         </section>
+
+        {/* Calendario */}
+        <div className="bg-white rounded-2xl p-6 shadow-xl mt-8">
+          <h2 className="text-lg font-semibold text-amber-600 mb-4 text-center">
+            Calendario de Tareas
+          </h2>
+          <Calendar
+            localizer={localizer}
+            events={tasks
+              .filter((t) => t.due_date)
+              .map((t) => ({
+                id: t.id,
+                title: t.title,
+                start: new Date(t.due_date!),
+                end: new Date(t.due_date!),
+              })) as CalendarEvent[]}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: 500 }}
+            messages={{
+              next: 'Sig.',
+              previous: 'Ant.',
+              today: 'Hoy',
+              month: 'Mes',
+              week: 'Semana',
+              day: 'Día',
+            }}
+            selectable
+            onSelectSlot={(slotInfo: { start: Date }) => {
+              setModalDate(slotInfo.start)
+              setShowModal(true)
+            }}
+            onSelectEvent={(event: CalendarEvent) => alert(`Tarea: ${event.title}`)}
+          />
+        </div>
       </div>
+
+      {/* 🔹 Modal flotante elegante */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-80 shadow-2xl relative animate-fadeIn">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-semibold text-amber-600 mb-3 text-center">
+              Nueva tarea para {modalDate?.toLocaleDateString()}
+            </h3>
+            <input
+              type="text"
+              placeholder="Título de la tarea"
+              value={modalTitle}
+              onChange={(e) => setModalTitle(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl p-3 mb-3 focus:ring-2 focus:ring-amber-400 outline-none"
+            />
+            <button
+              onClick={addTaskFromCalendar}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl py-3 transition"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
