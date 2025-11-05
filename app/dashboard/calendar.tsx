@@ -9,7 +9,6 @@ import withReactContent from 'sweetalert2-react-content'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'sweetalert2/dist/sweetalert2.min.css'
 
-// 📅 Localización
 const locales = { es }
 const localizer = dateFnsLocalizer({
   format,
@@ -25,6 +24,9 @@ type Task = {
   id: string
   title: string
   due_date?: string | null
+  color?: string
+  start_time?: string | null
+  end_time?: string | null
 }
 
 export default function CalendarView() {
@@ -43,39 +45,64 @@ export default function CalendarView() {
   }, [])
 
   async function fetchTasks(uid: string) {
-    const { data } = await supabase.from('tasks').select('*').eq('user_id', uid)
+    const { data, error } = await supabase.from('tasks').select('*').eq('user_id', uid)
+    if (error) console.error(error)
     setTasks((data as Task[] | null) || [])
   }
 
-  // 🟢 Crear tarea desde calendario
+  // 🟢 Crear tarea desde calendario (ahora con horario)
   async function addTaskFromCalendar(selectedDate: Date) {
-    if (!user) return MySwal.fire('Oops', 'Debes iniciar sesión para agregar tareas.', 'warning')
+    if (!user)
+      return MySwal.fire('Oops', 'Debes iniciar sesión para agregar tareas.', 'warning')
 
-    const { value: title } = await MySwal.fire({
+    const { value: formValues } = await MySwal.fire({
       title: `Nueva tarea`,
-      input: 'text',
-      inputLabel: `Fecha: ${selectedDate.toLocaleDateString()}`,
-      inputPlaceholder: 'Escribe el título de la tarea...',
+      html: `
+        <input id="taskTitle" class="swal2-input" placeholder="Título de la tarea">
+        <label>Hora inicio:</label>
+        <input id="startTime" type="time" class="swal2-input" value="09:00">
+        <label>Hora fin:</label>
+        <input id="endTime" type="time" class="swal2-input" value="10:00">
+        <select id="taskColor" class="swal2-select">
+          <option value="blue">🔵 Azul</option>
+          <option value="red">🔴 Rojo</option>
+          <option value="yellow">🟡 Amarillo</option>
+          <option value="green">🟢 Verde</option>
+        </select>
+      `,
+      focusConfirm: false,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
-      background: '#fff',
       confirmButtonColor: '#f59e0b',
+      preConfirm: () => {
+        const title = (document.getElementById('taskTitle') as HTMLInputElement).value
+        const color = (document.getElementById('taskColor') as HTMLSelectElement).value
+        const start_time = (document.getElementById('startTime') as HTMLInputElement).value
+        const end_time = (document.getElementById('endTime') as HTMLInputElement).value
+        if (!title.trim()) {
+          Swal.showValidationMessage('Por favor escribe un título')
+          return null
+        }
+        return { title, color, start_time, end_time }
+      },
     })
 
-    if (!title || !title.trim()) return
+    if (!formValues) return
 
-    // ✅ Guardar fecha como YYYY-MM-DD para evitar desfase
-    const localDate = selectedDate.toLocaleDateString('en-CA') 
+    const localDate = selectedDate.toLocaleDateString('en-CA')
 
     const { data, error } = await supabase
       .from('tasks')
       .insert([
         {
-          title: title.trim(),
+          title: formValues.title.trim(),
           user_id: user.id,
           due_date: localDate,
           status: 'todo',
+          color: formValues.color,
+          start_time: formValues.start_time,
+          end_time: formValues.end_time,
         },
       ])
       .select()
@@ -92,7 +119,7 @@ export default function CalendarView() {
     }
   }
 
-  // 🟡 Editar o eliminar tarea
+  // ✏️ Editar / eliminar tarea
   async function editTask(task: Task) {
     const { value: action } = await MySwal.fire({
       title: 'Acción para la tarea',
@@ -106,25 +133,50 @@ export default function CalendarView() {
       confirmButtonColor: '#f59e0b',
     })
 
-    // ✏️ Editar
     if (action === true) {
-      const { value: newTitle } = await MySwal.fire({
+      const { value: formValues } = await MySwal.fire({
         title: 'Editar tarea',
-        input: 'text',
-        inputValue: task.title,
-        inputPlaceholder: 'Nuevo nombre de la tarea',
+        html: `
+          <input id="taskTitle" class="swal2-input" value="${task.title}">
+          <label>Hora inicio:</label>
+          <input id="startTime" type="time" class="swal2-input" value="${task.start_time || '09:00'}">
+          <label>Hora fin:</label>
+          <input id="endTime" type="time" class="swal2-input" value="${task.end_time || '10:00'}">
+          <select id="taskColor" class="swal2-select">
+            <option value="blue" ${task.color === 'blue' ? 'selected' : ''}>🔵 Azul</option>
+            <option value="red" ${task.color === 'red' ? 'selected' : ''}>🔴 Rojo</option>
+            <option value="yellow" ${task.color === 'yellow' ? 'selected' : ''}>🟡 Amarillo</option>
+            <option value="green" ${task.color === 'green' ? 'selected' : ''}>🟢 Verde</option>
+          </select>
+        `,
+        focusConfirm: false,
         showCancelButton: true,
         confirmButtonText: 'Actualizar',
         confirmButtonColor: '#f59e0b',
+        preConfirm: () => {
+          const title = (document.getElementById('taskTitle') as HTMLInputElement).value
+          const color = (document.getElementById('taskColor') as HTMLSelectElement).value
+          const start_time = (document.getElementById('startTime') as HTMLInputElement).value
+          const end_time = (document.getElementById('endTime') as HTMLInputElement).value
+          if (!title.trim()) {
+            Swal.showValidationMessage('Por favor escribe un título')
+            return null
+          }
+          return { title, color, start_time, end_time }
+        },
       })
 
-      if (!newTitle || !newTitle.trim()) return
+      if (!formValues) return
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('tasks')
-        .update({ title: newTitle.trim() })
+        .update({
+          title: formValues.title.trim(),
+          color: formValues.color,
+          start_time: formValues.start_time,
+          end_time: formValues.end_time,
+        })
         .eq('id', task.id)
-        .select()
 
       if (error) {
         console.error(error)
@@ -132,7 +184,19 @@ export default function CalendarView() {
         return
       }
 
-      setTasks(tasks.map((t) => (t.id === task.id ? { ...t, title: newTitle } : t)))
+      setTasks(
+        tasks.map((t) =>
+          t.id === task.id
+            ? {
+                ...t,
+                title: formValues.title,
+                color: formValues.color,
+                start_time: formValues.start_time,
+                end_time: formValues.end_time,
+              }
+            : t
+        )
+      )
       MySwal.fire('✅ Actualizado', 'La tarea fue modificada.', 'success')
     }
 
@@ -162,22 +226,48 @@ export default function CalendarView() {
     }
   }
 
+  // 🎨 Colores de eventos
+  function eventStyleGetter(event: any) {
+    const colorMap: Record<string, string> = {
+      blue: '#3b82f6',
+      red: '#ef4444',
+      yellow: '#facc15',
+      green: '#22c55e',
+    }
+
+    return {
+      style: {
+        backgroundColor: colorMap[event.color] || '#9ca3af',
+        borderRadius: '8px',
+        color: 'white',
+        border: 'none',
+        padding: '4px',
+      },
+    }
+  }
+
+  // 🔄 Convertimos las tareas a eventos del calendario
   const events = tasks
     .filter((t) => t.due_date)
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      start: new Date(`${t.due_date}T00:00:00`),
-      end: new Date(`${t.due_date}T23:59:59`),
-    }))
+    .map((t) => {
+      const start = new Date(`${t.due_date}T${t.start_time || '09:00'}`)
+      const end = new Date(`${t.due_date}T${t.end_time || '10:00'}`)
+      return {
+        id: t.id,
+        title: t.title,
+        start,
+        end,
+        color: t.color || 'blue',
+      }
+    })
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-xl w-full max-w-7xl mx-auto">
       <h2 className="text-base sm:text-lg font-semibold text-amber-600 mb-4 text-center">
-        📅 Calendario de Tareas
+        📅 Calendario de Tareas con Horarios
       </h2>
 
-      <div className="rounded-xl overflow-hidden border border-gray-100 shadow-sm bg-white h-[70vh] sm:h-[75vh] md:h-[80vh]">
+      <div className="rounded-xl overflow-hidden border border-gray-100 shadow-sm bg-white h-[80vh]">
         <Calendar
           localizer={localizer}
           events={events}
@@ -186,10 +276,9 @@ export default function CalendarView() {
           date={date}
           view={view}
           onView={(newView: View) => setView(newView)}
-          onNavigate={(newDate: Date | string | number) => {
-            const next = newDate instanceof Date ? newDate : new Date(newDate)
-            setDate(next)
-          }}
+          onNavigate={(newDate: Date | string | number) =>
+            setDate(newDate instanceof Date ? newDate : new Date(newDate))
+          }
           views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
           messages={{
             next: 'Sig.',
@@ -208,11 +297,12 @@ export default function CalendarView() {
             if (task) editTask(task)
           }}
           onSelectSlot={(slotInfo) => addTaskFromCalendar(slotInfo.start)}
+          eventPropGetter={eventStyleGetter}
         />
       </div>
 
       <p className="text-xs text-gray-500 mt-3 text-center sm:hidden">
-        📱 Consejo: rota tu dispositivo o usa el modo “semana” para una mejor vista.
+        📱 Consejo: usa la vista “semana” o “día” para ver los horarios.
       </p>
     </div>
   )
