@@ -1,14 +1,17 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Kanban from './kanban'
 import CalendarView from './calendar'
 import Profile from './profile'
 import { BarChart3, CalendarDays, UserCircle, Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { supabase } from '../../lib/supabaseClient'
+import { useRouter } from 'next/navigation'
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<'kanban' | 'calendar' | 'profile'>('kanban')
   const [menuOpen, setMenuOpen] = useState(false)
+  const router = useRouter()
 
   const menuItems = [
     { id: 'kanban', label: 'Kanban', icon: <BarChart3 className="w-5 h-5" /> },
@@ -20,6 +23,31 @@ export default function DashboardPage() {
     setActiveTab(tab)
     setMenuOpen(false)
   }
+
+  // 🔹 Cerrar sesión automáticamente al cerrar pestaña o navegador
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      await supabase.auth.signOut()
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  // 🔹 Si no hay sesión, redirigir al login
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) router.push('/login')
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.push('/login')
+    })
+
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [router])
 
   return (
     <main className="min-h-screen flex bg-gradient-to-br from-orange-50 via-white to-amber-100 text-gray-900">
