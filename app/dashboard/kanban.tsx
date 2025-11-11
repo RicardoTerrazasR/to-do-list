@@ -86,11 +86,22 @@ export default function Kanban() {
     setNewDate('')
   }
 
-  async function moveTask(id: string, status: Task['status']) {
-    const { error } = await supabase.from('tasks').update({ status }).eq('id', id)
+  // 🔧 Lógica corregida: mover entre columnas secuencialmente
+  async function moveTask(id: string, direction: 'left' | 'right') {
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+
+    const order: Task['status'][] = ['todo', 'doing', 'done']
+    const currentIndex = order.indexOf(task.status)
+    const newIndex = direction === 'right' ? currentIndex + 1 : currentIndex - 1
+
+    if (newIndex < 0 || newIndex >= order.length) return
+
+    const newStatus = order[newIndex]
+    const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', id)
     if (error) return toast.error('Error al mover tarea')
 
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, status } : t)))
+    setTasks(tasks.map((t) => (t.id === id ? { ...t, status: newStatus } : t)))
     toast.success('Tarea movida ✨')
   }
 
@@ -240,17 +251,17 @@ export default function Kanban() {
                         )}
                       </div>
                       <div className="flex gap-2 mt-2 sm:mt-0">
-                        {current.key !== 'todo' && (
+                        {t.status !== 'todo' && (
                           <button
-                            onClick={() => moveTask(t.id, 'todo')}
+                            onClick={() => moveTask(t.id, 'left')}
                             className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
                           >
                             <ArrowLeft className="w-4 h-4 text-gray-700" />
                           </button>
                         )}
-                        {current.key !== 'done' && (
+                        {t.status !== 'done' && (
                           <button
-                            onClick={() => moveTask(t.id, 'done')}
+                            onClick={() => moveTask(t.id, 'right')}
                             className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
                           >
                             <ArrowRight className="w-4 h-4 text-gray-700" />
